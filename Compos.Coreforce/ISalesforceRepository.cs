@@ -10,6 +10,7 @@ namespace Compos.Coreforce
 {
     public interface ISalesforceRepository<T>
     {
+        Task<List<T>> GetAsync();
         Task<List<T>> GetAsync(FilterItemCollection<T> filterCollection);
         Task<List<T>> GetAsync(params Expression<Func<T, object>>[] selectItems);
         Task<List<T>> GetAsync(FilterItemCollection<T> filterCollection, params Expression<Func<T, object>>[] selectItems);

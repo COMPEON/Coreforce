@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.28010.2036
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Compos.Coreforce", "Compos.Coreforce\Compos.Coreforce.csproj", "{BD9F15B5-C348-4605-898D-DF87A1AC7A38}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Compos.Coreforce.UnitTests", "Compos.Coreforce.UnitTests\Compos.Coreforce.UnitTests.csproj", "{E534EB03-B6B2-41CC-8355-50440213C4AA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Compos.Coreforce.UnitTests", "Compos.Coreforce.UnitTests\Compos.Coreforce.UnitTests.csproj", "{E534EB03-B6B2-41CC-8355-50440213C4AA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Compos.Coreforce\Compos.Coreforce.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Authorization\" />
+  </ItemGroup>
+
 </Project>

@@ -25,6 +25,7 @@ namespace Compos.Coreforce
             CoreforceConfiguration.Password = credentials.Password;
             CoreforceConfiguration.Username = credentials.Username;
             CoreforceConfiguration.ApiVersion = apiVersion;
+            CoreforceConfiguration.MaxNumberOfParallelRunningTasks = numberOfParallelThreads;
 
             services.AddTransient<ISalesforceOpenAuthorization, SalesforceOpenAuthorization>();
             services.AddTransient(typeof(ISalesforceRepository<>), typeof(SalesforceRepository<>));

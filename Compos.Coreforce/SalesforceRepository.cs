@@ -36,6 +36,11 @@ namespace Compos.Coreforce
 
         #region Get
 
+        public async Task<List<T>> GetAsync()
+        {
+            return await ManageGetThreads(null, null);
+        }
+
         public async Task<List<T>> GetAsync(params Expression<Func<T, object>>[] selectItems)
         {
             return await ManageGetThreads(null, selectItems);
@@ -435,10 +440,9 @@ namespace Compos.Coreforce
                         var responseString = await message.Content.ReadAsStringAsync();
 
                         if (string.IsNullOrEmpty(responseString))
-                        {
                             updateResponse = JsonConvert.DeserializeObject<UpdateResult>(responseString);
-                            return updateResponse;
-                        }
+
+                        return updateResponse;
                     }
                 }
             }
@@ -446,8 +450,6 @@ namespace Compos.Coreforce
             {
                 throw;
             }
-
-            return updateResponse;
         }
 
         public async Task<BatchResult> UpdateAsync(List<T> objList, params Expression<Func<T, object>>[] fieldsToUpdate)
