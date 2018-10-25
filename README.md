@@ -128,19 +128,19 @@ public class TestClass
 Get all informations:
 
 ```cs
-var accounts = SalesforceRepository.GetAsync();
+var accounts = await SalesforceRepository.GetAsync();
 ```
 
 Get all informations and field selection:
 
 ```cs
-var accounts = SalesforceRepository.GetAsync(x => x.Id, x => x.Description);
+var accounts = await SalesforceRepository.GetAsync(x => x.Id, x => x.Description);
 ```
 
 Get an object by id:
 
 ```cs
-var account = SalesforceRepository.GetByIdAsync("ID");
+var account = await SalesforceRepository.GetByIdAsync("ID");
 ```
 
 #### Use filter 
@@ -148,7 +148,7 @@ var account = SalesforceRepository.GetByIdAsync("ID");
 Instead of getting all the rows you can filter them:
 
 ```cs
-var accounts = SalesforceRepository.GetAsync(
+var accounts = await SalesforceRepository.GetAsync(
 new FilterItemCollection<Account>(
 	new FilterItem<Account>(x => x.Name, "Test", FilterOperator.NotEquals, FilterConcatination.And),
 	new FilterItemIn<Account>(x => x.Id, new List<object>() { "ID_1", "ID_2" })
@@ -165,7 +165,7 @@ When you use multiple FilterItems you have to use the FilterConcatination And / 
 You can also combine filter and field selection:
 
 ```cs
-var accounts = SalesforceRepository.GetAsync(
+var accounts = await SalesforceRepository.GetAsync(
 new FilterItemCollection<Account>(
 	new FilterItem<Account>(x => x.Name, "Test", FilterOperator.NotEquals, FilterConcatination.And),
 	new FilterItemIn<Account>(x => x.Id, new List<object>() { "ID_1", "ID_2" })
