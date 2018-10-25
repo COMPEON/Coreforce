@@ -34,9 +34,9 @@ PM> Install-Package Compos.Coreforce
 Coreforce is an object based repository and needs sObjects as C# classes.
 Note the following:
 - each sObject requires a C# class
-- theres a direct correlation between the C# class name and the sObject (don't forget: a custom object ends with __c)
-- each salesforce field requires a property (property name has to similar to the api name)
-- mark readonly fields as readonly
+- there's a direct correlation between the C# class name and the sObject (don't forget: a custom object ends with __c)
+- each salesforce field requires a property (property name has to be similar to the API name)
+- mark read-only fields as read-only
 
 Example: sObject **Account**
 
@@ -67,7 +67,7 @@ public class Account
 
 ### Configuration
 
-Add the coreforce repository configuration
+Add the Coreforce repository configuration
 
 ```cs
 public static void ConfigureServices(IServiceCollection services)
@@ -98,7 +98,7 @@ The configuration extension method ***AddCoreforce*** needs the following:
   - ClientId and ClientSecret from your salesforce environment.
   - Your salesforce password and username.
   - GrantType: password
-- Api version
+- API version
 - max. number of parallel running threads
 
 The repository will always take the configured values.
@@ -125,19 +125,19 @@ public class TestClass
 
 ### Get
 
-Get all informations:
+Get all objects:
 
 ```cs
 var accounts = await SalesforceRepository.GetAsync();
 ```
 
-Get all informations and field selection:
+Get all objects and field selection:
 
 ```cs
 var accounts = await SalesforceRepository.GetAsync(x => x.Id, x => x.Description);
 ```
 
-Get an object by id:
+Get a specific object by id:
 
 ```cs
 var account = await SalesforceRepository.GetByIdAsync("ID");
@@ -199,7 +199,7 @@ await SalesforceRepository.UpdateAsync(
 
 ### Delete
 
-Delete a single sObject:
+Delete single sObject:
 
 ```cs
 await SalesforceRepository.DeleteAsync(account);
