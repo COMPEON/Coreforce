@@ -1,4 +1,5 @@
 # Welcome to Coreforce
+[![NuGet version (Compos.Coreforce)](https://img.shields.io/nuget/v/Compos.Coreforce.svg?style=flat-square)](https://www.nuget.org/packages/Compos.Coreforce/)
 
 Coreforce is a .NET Core wrapper library for Salesforce REST API.
 
@@ -21,7 +22,7 @@ Coreforce is a .NET Core wrapper library for Salesforce REST API.
 
 ## Setup
 
-You can get Coreforce via <a herf="https://www.nuget.org/packages/Compos.Coreforce">nuget</a>:
+You can get Coreforce via nuget:
 
 ```cs
 PM> Install-Package Compos.Coreforce
