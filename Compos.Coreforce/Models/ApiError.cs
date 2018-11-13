@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Compos.Coreforce.Models
 {
-    public class UpdateResult
+    public class ApiError
     {
         [JsonProperty("message")]
         public string Message { get; set; }
@@ -11,5 +11,10 @@ namespace Compos.Coreforce.Models
         public string ErrorCode { get; set; }
         [JsonProperty("fields")]
         public List<string> Fields { get; set; }
+
+        public ApiError()
+        {
+            Fields = new List<string>();
+        }
     }
 }

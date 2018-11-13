@@ -1,8 +1,9 @@
 ﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Compos.Coreforce.Models
 {
-    public class InsertResult : UpdateResult
+    public class InsertResult : List<ApiError>
     {
         [JsonProperty("id")]
         public string Id { get; set; }

@@ -18,7 +18,7 @@ namespace Compos.Coreforce
         Task<InsertResult> InsertAsync(T obj);
         Task<SObjectTreeResult> InsertAsync<U>(List<U> objList, bool stopByException = true, bool parallelProcessing = false)
             where U : InsertAttributes, T, new();
-        Task<UpdateResult> UpdateAsync(T obj, params Expression<Func<T, object>>[] relatingObject);
+        Task<ApiError> UpdateAsync(T obj, params Expression<Func<T, object>>[] relatingObject);
         Task<BatchResult> UpdateAsync(List<T> objList, params Expression<Func<T, object>>[] relatingObject);
         Task<BatchResult> DeleteAsync(T obj);
         Task<BatchResult> DeleteAsync(List<T> objList);

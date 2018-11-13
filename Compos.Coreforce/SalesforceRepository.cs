@@ -414,7 +414,7 @@ namespace Compos.Coreforce
 
         #endregion
 
-        public async Task<UpdateResult> UpdateAsync(T obj, params Expression<Func<T, object>>[] relatingObject)
+        public async Task<ApiError> UpdateAsync(T obj, params Expression<Func<T, object>>[] relatingObject)
         {
             var authorizationResult = await SalesforceOpenAuthorization.Authorize();
 
@@ -422,7 +422,7 @@ namespace Compos.Coreforce
                 throw new NullReferenceException("Authorization result is null.");
 
             string salesForceUrl = $"{authorizationResult.InstanceUrl}/services/data/{CoreforceConfiguration.ApiVersion}/sobjects/{typeof(T).Name}";
-            var updateResponse = new UpdateResult();
+            var updateResponse = new ApiError();
 
             try
             {
@@ -440,7 +440,7 @@ namespace Compos.Coreforce
                         var responseString = await message.Content.ReadAsStringAsync();
 
                         if (string.IsNullOrEmpty(responseString))
-                            updateResponse = JsonConvert.DeserializeObject<UpdateResult>(responseString);
+                            updateResponse = JsonConvert.DeserializeObject<ApiError>(responseString);
 
                         return updateResponse;
                     }

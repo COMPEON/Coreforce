@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace Compos.Coreforce.Models.Soql
+namespace Compos.Coreforce.Models
 {
     class SelectResult<T>
     {
