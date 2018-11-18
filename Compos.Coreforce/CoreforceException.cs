@@ -4,58 +4,72 @@ using System.Collections.Generic;
 
 namespace Compos.Coreforce
 {
-    class CoreforceException : Exception
+    public class CoreforceException : Exception
     {
         public new Exception InnerException { get; private set; }
         public new string Message { get; private set; }
+        public CoreforceError CoreforceError { get; private set; }
         public List<ApiError> ApiErrors { get; set; }
 
         public CoreforceException(
-            string error,
-            List<ApiError> apiErrors,
-            Exception innerException
-            )
-        {
-            ApiErrors = apiErrors;
-            InnerException = innerException;
-            Message = error;
-        }
-
-        public CoreforceException(
-            CoreforceError error,
-            Exception innerException
-            ) : this(error.ToString(), null, innerException)
-        { }
-
-        public CoreforceException(
-            string error
-            )
-        {
-            ApiErrors = null;
-            InnerException = null;
-            Message = error;
-        }
-
-        public CoreforceException(
-            CoreforceError error
-            ) : this(error.ToString())
-        { }
-
-        public CoreforceException(
-            CoreforceError error,
+            CoreforceError coreforceError,
+            string message,
+            Exception innerException,
             List<ApiError> apiErrors
-            ) : this(error.ToString(), apiErrors, null)
+            )
+        {
+            CoreforceError = coreforceError;
+            Message = message;
+            InnerException = innerException;
+            ApiErrors = apiErrors;
+        }
+
+        public CoreforceException(
+            CoreforceError coreforceError,
+            string message,
+            Exception innerException
+            ) : this(coreforceError, message, innerException, null)
         { }
 
         public CoreforceException(
-            string error,
+            CoreforceError coreforceError,
             Exception innerException
-            ) : this(error, null, innerException)
+            ) : this(coreforceError, coreforceError.ToString(), innerException, null)
+        { }
+
+        public CoreforceException(
+            CoreforceError coreforceError,
+            List<ApiError> apiErrors
+            ) : this(coreforceError, coreforceError.ToString(), null, apiErrors)
+        { }
+
+        public CoreforceException(
+            CoreforceError coreforceError,
+            string message
+            ) : this(coreforceError, message, null, null)
+        { }
+
+        public CoreforceException(
+            CoreforceError coreforceError
+            ) : this(coreforceError, coreforceError.ToString(), null, null)
         { }
     }
 
     public enum CoreforceError
     {
+        /// <summary>
+        /// Thrown when coreforce settings are missing (call AddCoreforce method).
+        /// </summary>
+        SettingsException,
+
+        /// <summary>
+        /// Thrown when salesforce response is BadRequest.
+        /// </summary>
+        AuthorizationBadRequest,
+
+        /// <summary>
+        /// Thrown when authorization throws not known error.
+        /// </summary>
         AuthorizationError,
         CommandIsEmpty,
         SalesforceObjectNotFound,

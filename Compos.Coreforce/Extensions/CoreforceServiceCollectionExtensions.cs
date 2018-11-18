@@ -1,9 +1,6 @@
 ﻿using Compos.Coreforce.Models.Authorization;
 using Compos.Coreforce.Models.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
-using System.Linq;
-using System;
 using Compos.Coreforce.Authorization;
 
 namespace Compos.Coreforce
@@ -12,25 +9,38 @@ namespace Compos.Coreforce
     {
         public static IServiceCollection AddCoreforce(
             this IServiceCollection services, 
-            OpenAuthorizationCredentials credentials, 
-            string apiVersion = "v40.0", 
-            int numberOfParallelThreads = 10
+            Environment environment,
+            string username,
+            string password,
+            string clientId,
+            string clientSecret,
+            string apiVersion = "v43.0"
             )
         {
             // Set credentials
-            CoreforceConfiguration.AuthorizationUrl = credentials.AuthorizationUrl;
-            CoreforceConfiguration.ClientId = credentials.ClientId;
-            CoreforceConfiguration.ClientSecret = credentials.ClientSecret;
-            CoreforceConfiguration.GrantType = credentials.GrantType;
-            CoreforceConfiguration.Password = credentials.Password;
-            CoreforceConfiguration.Username = credentials.Username;
+            CoreforceConfiguration.ClientId = clientId;
+            CoreforceConfiguration.ClientSecret = clientSecret;
+            CoreforceConfiguration.GrantType = "password";
+            CoreforceConfiguration.Password = password;
+            CoreforceConfiguration.Username = username;
             CoreforceConfiguration.ApiVersion = apiVersion;
-            CoreforceConfiguration.MaxNumberOfParallelRunningTasks = numberOfParallelThreads;
+
+            if (environment == Environment.Production)
+                CoreforceConfiguration.AuthorizationUrl = "https://login.salesforce.com/services/oauth2/token";
+
+            if (environment == Environment.Sandbox)
+                CoreforceConfiguration.AuthorizationUrl = "https://test.salesforce.com/services/oauth2/token";
 
             services.AddTransient<ISalesforceOpenAuthorization, SalesforceOpenAuthorization>();
-            services.AddTransient(typeof(ISalesforceRepository<>), typeof(SalesforceRepository<>));
+            services.AddTransient(typeof(ISalesforceClient), typeof(SalesforceClient));
 
             return services;
         }
+    }
+
+    public enum Environment
+    {
+        Production,
+        Sandbox
     }
 }

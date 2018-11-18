@@ -13,13 +13,11 @@ using Compos.Coreforce.Models.Configuration;
 using Compos.Coreforce.Models.Description;
 using Newtonsoft.Json;
 using System.Linq;
-using Compos.Coreforce.Models.Authorization;
 using Compos.Coreforce.Attributes;
 using Compos.Coreforce.Extensions;
 using System.Reflection;
 using Compos.Coreforce.ContractResolver;
 using System.Net;
-using Newtonsoft.Json.Serialization;
 
 namespace Compos.Coreforce
 {
@@ -309,7 +307,7 @@ namespace Compos.Coreforce
                                             obj,
                                             new JsonSerializerSettings
                                             {
-                                                ContractResolver = new ImportContractResolver()
+                                                ContractResolver = new CoreforceContractResolver()
                                             }),
                                         Encoding.UTF8,
                                         "application/json"
@@ -330,7 +328,7 @@ namespace Compos.Coreforce
             }
             catch (Exception exception)
             {
-                throw new CoreforceException($"Error while inserting the object {JsonConvert.SerializeObject(obj)}. Please check the inner exception.", exception);
+                throw new CoreforceException(CoreforceError.InsertError, $"Error while inserting the object {JsonConvert.SerializeObject(obj)}. Please check the inner exception.", exception);
             }
         }
 
@@ -390,7 +388,7 @@ namespace Compos.Coreforce
 
                 await Update<T>(typeof(T).Name, objAsDictionary, id.ToString());
             }
-            catch(Exception exception)
+            catch(Exception)
             {
                 throw;
             }
@@ -426,7 +424,7 @@ namespace Compos.Coreforce
                     
                 await Update<dynamic>(sObject, objAsDictionary, id.ToString());
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 throw;
             }
@@ -453,7 +451,14 @@ namespace Compos.Coreforce
                                 await client.PatchAsync(
                                     url,
                                     new StringContent(
-                                        JsonConvert.SerializeObject(objAsDictionary),
+                                        JsonConvert.SerializeObject(
+                                            objAsDictionary,
+                                            new JsonSerializerSettings
+                                            {
+                                                ContractResolver = new CoreforceContractResolver(
+                                                    objAsDictionary.Select(x => x.Key).ToList()
+                                                    )
+                                            }),
                                         Encoding.UTF8,
                                         "application/json"
                                         )))
@@ -473,7 +478,7 @@ namespace Compos.Coreforce
             }
             catch (Exception exception)
             {
-                throw new CoreforceException($"Error while delete the sObject {id}. Please check the inner exception.", exception);
+                throw new CoreforceException(CoreforceError.UpdateError, $"Error while delete the sObject {id}. Please check the inner exception.", exception);
             }
         }
 
@@ -515,7 +520,7 @@ namespace Compos.Coreforce
             }
             catch (Exception exception)
             {
-                throw new CoreforceException($"Error while delete the sObject {id}. Please check the inner exception.", exception);
+                throw new CoreforceException(CoreforceError.DeleteError, $"Error while delete the sObject {id}. Please check the inner exception.", exception);
             }
         }
 

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
-    <Version>0.2.0</Version>
+    <Version>0.9.0</Version>
     <Authors>COMPEON GmbH</Authors>
     <Product>Coreforce</Product>
     <Description>Coreforce is an open source .NET Core repository library for Salesforce REST API.
@@ -12,8 +12,8 @@
     <PackageProjectUrl>https://github.com/COMPEON/Coreforce</PackageProjectUrl>
     <RepositoryUrl>https://github.com/COMPEON/Coreforce</RepositoryUrl>
     <PackageTags>Salesforce Repository REST API</PackageTags>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
-    <FileVersion>0.2.0.0</FileVersion>
+    <AssemblyVersion>0.9.0.0</AssemblyVersion>
+    <FileVersion>0.9.0.0</FileVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 

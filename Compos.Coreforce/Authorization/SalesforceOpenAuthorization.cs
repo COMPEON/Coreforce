@@ -10,28 +10,15 @@ namespace Compos.Coreforce.Authorization
 {
     public class SalesforceOpenAuthorization : ISalesforceOpenAuthorization
     {
-        // Credentials
-        public OpenAuthorizationCredentials Credentials { get; set; }
+        // Only for tests
+        protected HttpClient _client = null;
 
         // Call minimize object
-        private static readonly object _oAuthLock = new object();
-        private static AuthorizationResult _oAuthResult = null;
-        private static DateTime _dateTime = DateTime.Now;
+        protected static readonly object _oAuthLock = new object();
+        protected static AuthorizationResult _oAuthResult = null;
+        protected static DateTime _dateTime = DateTime.Now;
 
-        public SalesforceOpenAuthorization()
-        {
-            Credentials = new OpenAuthorizationCredentials()
-            {
-                AuthorizationUrl = CoreforceConfiguration.AuthorizationUrl,
-                ClientId = CoreforceConfiguration.ClientId,
-                ClientSecret = CoreforceConfiguration.ClientSecret,
-                GrantType = CoreforceConfiguration.GrantType,
-                Password = CoreforceConfiguration.Password,
-                Username = CoreforceConfiguration.Username
-            };
-        }
-
-        public AuthorizationResult CurrentOAuthResult
+        protected AuthorizationResult CurrentOAuthResult
         {
             get
             {
@@ -58,46 +45,59 @@ namespace Compos.Coreforce.Authorization
 
         public async Task<AuthorizationResult> Authorize()
         {
-            var authorizationResult = CurrentOAuthResult;
-            if (authorizationResult != null)
-                return authorizationResult;
-
             try
             {
-                using (var client = new HttpClient())
+                if (string.IsNullOrEmpty(CoreforceConfiguration.ApiVersion) ||
+                    string.IsNullOrEmpty(CoreforceConfiguration.ClientId) ||
+                    string.IsNullOrEmpty(CoreforceConfiguration.ClientSecret) ||
+                    string.IsNullOrEmpty(CoreforceConfiguration.Password) ||
+                    string.IsNullOrEmpty(CoreforceConfiguration.Username))
+                    throw new CoreforceException(CoreforceError.SettingsException);
+
+                var authorizationResult = CurrentOAuthResult;
+                if (authorizationResult != null)
+                    return authorizationResult;
+
+                using (var client = _client ?? new HttpClient())
                 {
                     ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                     using (var content =
                         new MultipartFormDataContent())
                     {
-                        content.Add(new StringContent(Credentials.GrantType), "grant_type");
-                        content.Add(new StringContent(Credentials.ClientId), "client_id");
-                        content.Add(new StringContent(Credentials.ClientSecret), "client_secret");
-                        content.Add(new StringContent(Credentials.Username), "username");
-                        content.Add(new StringContent(Credentials.Password), "password");
+                        content.Add(new StringContent(CoreforceConfiguration.GrantType), "grant_type");
+                        content.Add(new StringContent(CoreforceConfiguration.ClientId), "client_id");
+                        content.Add(new StringContent(CoreforceConfiguration.ClientSecret), "client_secret");
+                        content.Add(new StringContent(CoreforceConfiguration.Username), "username");
+                        content.Add(new StringContent(CoreforceConfiguration.Password), "password");
 
                         using (
                            var message =
-                               await client.PostAsync(Credentials.AuthorizationUrl, content))
+                               await client.PostAsync(CoreforceConfiguration.AuthorizationUrl, content))
                         {
                             var responseString = await message.Content.ReadAsStringAsync();
                             authorizationResult = JsonConvert.DeserializeObject<AuthorizationResult>(responseString);
 
-                            if (authorizationResult != null)
+                            if (message.StatusCode == HttpStatusCode.OK)
                             {
                                 this.CurrentOAuthResult = authorizationResult;
+                                return authorizationResult;
                             }
+
+                            else
+                                throw new CoreforceException(CoreforceError.AuthorizationBadRequest, $"Response: {responseString}");
                         }
                     }
                 }
             }
-            catch (Exception)
+            catch (CoreforceException)
             {
                 throw;
             }
-
-            return authorizationResult;
+            catch(Exception exception)
+            {
+                throw new CoreforceException(CoreforceError.AuthorizationError, exception);
+            }
         }
     }
 }
