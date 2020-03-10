@@ -9,6 +9,7 @@
         public static string ClientId { get; set; }
         public static string ClientSecret { get; set; }
         public static string ApiVersion { get; set; }
-        public static int MaxNumberOfParallelRunningTasks { get; set; }
+        public static bool IsCacheEnabled { get; set; }
+        public static int CacheExpirationInSeconds { get; set; }
     }
 }

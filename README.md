@@ -1,7 +1,7 @@
 # Welcome to Coreforce
 [![NuGet version (Compos.Coreforce)](https://img.shields.io/nuget/v/Compos.Coreforce.svg?style=flat-square)](https://www.nuget.org/packages/Compos.Coreforce/)
 
-Coreforce is a .NET Core wrapper library for Salesforce REST API.
+Coreforce is a .NET Core client library for Salesforce REST API.
 
 ---
 
@@ -15,7 +15,9 @@ Coreforce is a .NET Core wrapper library for Salesforce REST API.
 - **Speed up your application:**
   - get, insert, update or delete multiple salesforce objects **parallel or sequential**.
   - **get** a salesforce object **by id**.
-
+- Don't know your Salesforce, Coreforce will know 
+  - **get, insert, update and delete** dynamic objects instead of classes
+  
 ---
 
 # Getting started
@@ -29,6 +31,10 @@ PM> Install-Package Compos.Coreforce
 ```
 
 ## Usage
+
+### Dynamic client
+
+You are able to work 
 
 ### sObjects as C# classes
 
