@@ -53,6 +53,21 @@ namespace Compos.Coreforce
             CoreforceError coreforceError
             ) : this(coreforceError, coreforceError.ToString(), null, null)
         { }
+
+        public override string ToString()
+        {
+            var apiErrors = string.Empty;
+
+            if (ApiErrors != null && ApiErrors.Count > 0)
+                foreach (var apiError in ApiErrors)
+                    apiErrors = $"{apiErrors}; {apiError.ToString()}";
+
+            return $@"Coreforce exception => 
+                        Type: {CoreforceError}, 
+                        Message: {Message},
+                        ApiErrors: {apiErrors},
+                        InnerException: {InnerException}";
+        }
     }
 
     public enum CoreforceError
@@ -71,6 +86,12 @@ namespace Compos.Coreforce
         /// Thrown when authorization throws not known error.
         /// </summary>
         AuthorizationError,
+
+        /// <summary>
+        /// Error when json deserialization fails.
+        /// </summary>
+        JsonDeserializationError,
+
         CommandIsEmpty,
         SalesforceObjectNotFound,
         ProcessingError,

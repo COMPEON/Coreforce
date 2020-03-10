@@ -3,36 +3,41 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using System;
+using Compos.Coreforce.Models.Description;
 
 namespace Compos.Coreforce
 {
     public interface ISalesforceClient
     {
-        Task<List<T>> Get<T>();
-        Task<List<T>> Get<T>(params Expression<Func<T, object>>[] fields);
-        Task<List<T>> Get<T>(FilterCollection filterCollection);
-        Task<List<T>> Get<T>(FilterCollection filterCollection, params Expression<Func<T, object>>[] fields);
+        Task<Description> GetDescriptionAsync<T>();
 
-        Task<List<dynamic>> Get(string sObject);
-        Task<List<dynamic>> Get(string sObject, params string[] fields);
-        Task<List<dynamic>> Get(string sObject, FilterCollection filterCollection);
-        Task<List<dynamic>> Get(string sObject, FilterCollection filterCollection, params string[] fields);
+        Task<Description> GetDescriptionAsync(string sObject);
 
-        Task<T> GetById<T>(string id);
-        Task<dynamic> GetById(string sObject, string id);
+        Task<List<T>> GetAsync<T>();
+        Task<List<T>> GetAsync<T>(params Expression<Func<T, object>>[] fields);
+        Task<List<T>> GetAsync<T>(FilterCollection filterCollection);
+        Task<List<T>> GetAsync<T>(FilterCollection filterCollection, params Expression<Func<T, object>>[] fields);
 
-        Task Update<T>(T obj);
-        Task Update<T>(T obj, params Expression<Func<T, object>>[] fields);
-        Task Update(string sObject, dynamic obj);
-        Task Update(string sObject, dynamic obj, params string[] fields);
+        Task<List<dynamic>> GetAsync(string sObject);
+        Task<List<dynamic>> GetAsync(string sObject, params string[] fields);
+        Task<List<dynamic>> GetAsync(string sObject, FilterCollection filterCollection);
+        Task<List<dynamic>> GetAsync(string sObject, FilterCollection filterCollection, params string[] fields);
 
-        Task<string> Insert<T>(T obj);
-        Task<string> Insert(string sObject, dynamic obj);
+        Task<T> GetByIdAsync<T>(string id) where T : class;
+        Task<dynamic> GetByIdAsync(string sObject, string id);
 
-        Task Delete<T>(string id);
-        Task Delete(string sObject, string id);
+        Task UpdateAsync<T>(T obj);
+        Task UpdateAsync<T>(T obj, params Expression<Func<T, object>>[] fields);
+        Task UpdateAsync(string sObject, dynamic obj);
+        Task UpdateAsync(string sObject, dynamic obj, params string[] fields);
 
-        Task<List<T>> Query<T>(string command);
-        Task<List<dynamic>> Query(string command);
+        Task<string> InsertAsync<T>(T obj);
+        Task<string> InsertAsync(string sObject, dynamic obj);
+
+        Task DeleteAsync<T>(string id);
+        Task DeleteAsync(string sObject, string id);
+
+        Task<List<T>> QueryAsync<T>(string command);
+        Task<List<dynamic>> QueryAsync(string command);
     }
 }

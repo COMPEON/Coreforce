@@ -20,7 +20,7 @@ namespace Compos.Coreforce.UnitTests.Extensions
                 "v40.0"
                 );
             
-            Assert.AreEqual(Models.Configuration.CoreforceConfiguration.AuthorizationUrl, "http://salesforceUrl");
+            Assert.AreEqual(Models.Configuration.CoreforceConfiguration.AuthorizationUrl, "https://login.salesforce.com/services/oauth2/token");
             Assert.AreEqual(Models.Configuration.CoreforceConfiguration.ClientId, "ClientId");
             Assert.AreEqual(Models.Configuration.CoreforceConfiguration.ClientSecret, "ClientSecret");
             Assert.AreEqual(Models.Configuration.CoreforceConfiguration.GrantType, "password");

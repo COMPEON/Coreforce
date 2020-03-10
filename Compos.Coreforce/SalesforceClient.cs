@@ -18,12 +18,18 @@ using Compos.Coreforce.Extensions;
 using System.Reflection;
 using Compos.Coreforce.ContractResolver;
 using System.Net;
+using Compos.Coreforce.Cache;
 
 namespace Compos.Coreforce
 {
     public class SalesforceClient : ISalesforceClient
     {
-        private static readonly ConcurrentBag<Description> descriptionList = new ConcurrentBag<Description>();
+        private const string UNABLE_TO_LOCK_ROW = "UNABLE_TO_LOCK_ROW";
+        public static int cnt = 0;
+        // Only for tests
+        protected HttpClient _client = null;
+
+        protected static readonly ConcurrentBag<Description> descriptionList = new ConcurrentBag<Description>();
         public ISalesforceOpenAuthorization SalesforceOpenAuthorization { get; private set; }
 
         public SalesforceClient(
@@ -38,39 +44,54 @@ namespace Compos.Coreforce
             };
         }
 
-        public async Task<List<T>> Get<T>()
+        public async Task<Description> GetDescriptionAsync<T>()
+        {
+            return await GetDescription(AttributeReader.GetSalesforceObjectName<T>());
+        }
+
+        public async Task<Description> GetDescriptionAsync(string sObject)
+        {
+            return await GetDescription(sObject);
+        }
+
+        public async Task<List<T>> GetAsync<T>()
         {
             var select = BuildSelectUrl<T>(null, null);
-            return await Query<T>(select);
+            return await QueryAsync<T>(select);
         }
 
-        public async Task<List<T>> Get<T>(params Expression<Func<T, object>>[] fields)
+        public async Task<List<T>> GetAsync<T>(params Expression<Func<T, object>>[] fields)
         {
             var select = BuildSelectUrl<T>(null, fields);
-            return await Query<T>(select);
+            return await QueryAsync<T>(select);
         }
 
-        public async Task<List<T>> Get<T>(FilterCollection filterCollection)
+        public async Task<List<T>> GetAsync<T>(FilterCollection filterCollection)
         {
             var select = BuildSelectUrl<T>(filterCollection, null);
-            return await Query<T>(select);
+            return await QueryAsync<T>(select);
         }
 
-        public async Task<List<T>> Get<T>(FilterCollection filterCollection, params Expression<Func<T, object>>[] fields)
+        public async Task<List<T>> GetAsync<T>(FilterCollection filterCollection, params Expression<Func<T, object>>[] fields)
         {
             var select = BuildSelectUrl<T>(filterCollection, fields);
-            return await Query<T>(select);
+            return await QueryAsync<T>(select);
         }
 
-        private string BuildSelectUrl<T>(
+        protected string BuildSelectUrl<T>(
             FilterCollection filterCollection,
             Expression<Func<T, object>>[] fields
             )
         {
             List<MemberExpression> memberExpressions = new List<MemberExpression>();
-            string requestUrl = $"Select+";
+            var sObjectFields = GetSalesforceObjectFields(
+                AttributeReader.GetSalesforceObjectName<T>(), 
+                SalesforceObjectFieldAccessibility.All
+                ).GetAwaiter().GetResult();
+
+            string requestUrl = $"select+";
             var properties = typeof(T).GetProperties().Where(x => !x.CustomAttributes.Any(y =>
-                y.AttributeType == typeof(JsonIgnoreAttribute))
+                y.AttributeType == typeof(JsonIgnoreAttribute) || y.AttributeType == typeof(NoSalesforceField))
                 ).ToList();
 
             bool firstElement = true;
@@ -85,7 +106,10 @@ namespace Compos.Coreforce
 
             foreach (PropertyInfo property in properties)
             {
-                if (memberExpressions.Any(x => x.Member.Name == property.Name) || memberExpressions.Count == 0)
+                if (
+                    (memberExpressions.Any(x => x.Member.Name == property.Name) || 
+                    memberExpressions.Count == 0) &&
+                    sObjectFields.Any(x => x.ToLower() == property.Name.ToLower()))
                 {
                     if (firstElement)
                     {
@@ -96,9 +120,31 @@ namespace Compos.Coreforce
                     else
                         requestUrl = $"{requestUrl}+,+{property.Name}";
                 }
+                else
+                {
+                    var jsonPropertyNames = GetJsonPropertyNames(property);
+
+                    foreach (var jsonPropertyName in jsonPropertyNames)
+                    {
+                        if (
+                        (memberExpressions.Any(x => x.Member.Name == jsonPropertyName) ||
+                        memberExpressions.Count == 0) &&
+                        sObjectFields.Any(x => x.ToLower() == jsonPropertyName.ToLower()))
+                        {
+                            if (firstElement)
+                            {
+                                requestUrl = $"{requestUrl}{jsonPropertyName}";
+                                firstElement = false;
+                            }
+
+                            else
+                                requestUrl = $"{requestUrl}+,+{jsonPropertyName}";
+                        }
+                    }
+                }
             }
 
-            requestUrl = $"{requestUrl}+from+{typeof(T).Name}";
+            requestUrl = $"{requestUrl}+from+{AttributeReader.GetSalesforceObjectName<T>()}";
 
             if (filterCollection is null)
                 return requestUrl;
@@ -108,74 +154,109 @@ namespace Compos.Coreforce
             return requestUrl;
         }
 
-        public async Task<List<dynamic>> Get(string sObject)
+        private List<string> GetJsonPropertyNames(PropertyInfo propertyInfo)
         {
-            var fields = await GetSalesforceObjectFields(sObject, false);
+            var jsonPropertyNames = new List<string>();
+
+            CustomAttributeData attribute = propertyInfo.CustomAttributes
+                .FirstOrDefault(x => x.AttributeType == typeof(JsonPropertyAttribute));
+
+            if (attribute is null)
+                return jsonPropertyNames;
+
+            var jsonPropertyArguments = attribute.ConstructorArguments
+                .Where(x => x.ArgumentType == typeof(string));
+
+            foreach (var jsonPropertyArgument in jsonPropertyArguments)
+                if(jsonPropertyArgument.Value != null)
+                    jsonPropertyNames.Add(jsonPropertyArgument.Value.ToString());
+
+            return jsonPropertyNames;
+        }
+
+        public async Task<List<dynamic>> GetAsync(string sObject)
+        {
+            var fields = await GetSalesforceObjectFields(
+                sObject,
+                SalesforceObjectFieldAccessibility.All
+                );
             StringBuilder fieldNames = new StringBuilder();
 
             foreach (var field in fields)
-                fieldNames.Append(fieldNames.Length == 0 ? $"{field}" : $", {field}");
+                fieldNames.Append(fieldNames.Length == 0 ? $"{field}" : $"+,+{field}");
 
-            return await Query($"select {fieldNames.ToString()} from {sObject}");
+            return await QueryAsync($"select+{fieldNames.ToString()}+from+{sObject}");
         }
 
-        public async Task<List<dynamic>> Get(string sObject, params string[] fields)
+        public async Task<List<dynamic>> GetAsync(string sObject, params string[] fields)
         {
             StringBuilder fieldNames = new StringBuilder();
 
             foreach (var field in fields)
-                fieldNames.Append(fieldNames.Length == 0 ? $"{field}" : $", {field}");
+                fieldNames.Append(fieldNames.Length == 0 ? $"{field}" : $"+,+{field}");
 
-            return await Query($"select {fieldNames.ToString()} from {sObject}");
+            return await QueryAsync($"select+{fieldNames.ToString()}+from+{sObject}");
         }
 
-        public async Task<List<dynamic>> Get(string sObject, FilterCollection filterCollection)
+        public async Task<List<dynamic>> GetAsync(string sObject, FilterCollection filterCollection)
         {
-            var fieldNames = await GetSalesforceObjectFields(sObject, false);
+            var fieldNames = await GetSalesforceObjectFields(sObject, SalesforceObjectFieldAccessibility.All);
             StringBuilder fields = new StringBuilder();
 
             foreach (var fieldName in fieldNames)
-                fields.Append(fields.Length == 0 ? $"{fieldName}" : $", {fieldName}");
+                fields.Append(fields.Length == 0 ? $"{fieldName}" : $"+,+{fieldName}");
 
-            return await Query($"select {fields.ToString()} from {sObject} WHERE {filterCollection.Get()}");
+            return await QueryAsync($"select+{fields.ToString()}+from+{sObject}+where{filterCollection.Get()}");
         }
 
-        public async Task<List<dynamic>> Get(string sObject, FilterCollection filterCollection, params string[] fields)
+        public async Task<List<dynamic>> GetAsync(string sObject, FilterCollection filterCollection, params string[] fields)
         {
             StringBuilder fieldNames = new StringBuilder();
 
             foreach (var field in fields)
-                fieldNames.Append(fieldNames.Length == 0 ? $"{field}" : $", {field}");
+                fieldNames.Append(fieldNames.Length == 0 ? $"{field}" : $"+,+{field}");
 
-            return await Query($"select {fieldNames.ToString()} from {sObject} WHERE {filterCollection.Get()}");
+            return await QueryAsync($"select+{fieldNames.ToString()}+from+{sObject}+where{filterCollection.Get()}");
         }
 
-        public async Task<T> GetById<T>(string id)
+        public async Task<T> GetByIdAsync<T>(string id) where T : class
         {
+            var cachedObj = CacheHelper.Get<T>(id);
+
+            if (cachedObj != null)
+                return cachedObj;
+
             var select = BuildSelectUrl<T>(
                 new FilterCollection(
-                    new List<IFilter>()
-                    {
-                        new Filter.Filter("id", "=", id)
-                    }), null);
+                    new Filter.Filter("id", "=", id)
+                    ), null);
 
-            var objs = await Query<T>(select);
+            var objs = new List<T>();
+            objs.AddCollection(await QueryAsync<T>(select));
+
             return objs.FirstOrDefault();
         }
 
-        public async Task<dynamic> GetById(string sObject, string id)
+        public async Task<dynamic> GetByIdAsync(string sObject, string id)
         {
-            var fieldNames = await GetSalesforceObjectFields(sObject, false);
+            var cachedObj = CacheHelper.Get<dynamic>(id);
+
+            if (cachedObj != null)
+                return cachedObj as ExpandoObject;
+
+            var fieldNames = await GetSalesforceObjectFields(sObject, SalesforceObjectFieldAccessibility.All);
             StringBuilder fields = new StringBuilder();
 
             foreach (var fieldName in fieldNames)
                 fields.Append(fields.Length == 0 ? $"{fieldName}" : $", {fieldName}");
 
-            var objs = await Query($"select {fields.ToString()} from {sObject} WHERE id='{id}'");
+            var objs = new List<dynamic>();
+            objs.AddCollection(await QueryAsync($"select {fields.ToString()} from {sObject} WHERE id='{id}'"));
+
             return objs.FirstOrDefault();
         }
 
-        public async Task<List<T>> Query<T>(string command)
+        public async Task<List<T>> QueryAsync<T>(string command)
         {
             try
             {
@@ -192,7 +273,7 @@ namespace Compos.Coreforce
 
                 do
                 {
-                    using (var client = new HttpClient())
+                    using (var client = _client ?? new HttpClient())
                     {
                         client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
 
@@ -204,7 +285,19 @@ namespace Compos.Coreforce
                                         selectResult.NextRecordsUrl)))
                         {
                             var responseString = await message.Content.ReadAsStringAsync();
-                            selectResult = JsonConvert.DeserializeObject<SelectResult<T>>(responseString);
+
+                            try
+                            {
+                                selectResult = JsonConvert.DeserializeObject<SelectResult<T>>(responseString);
+                            }
+                            catch (JsonException exception)
+                            {
+                                throw new CoreforceException(
+                                    CoreforceError.JsonDeserializationError,
+                                    $"Response: {responseString}",
+                                    exception
+                                    );
+                            }
 
                             if (selectResult?.Records != null)
                                 records.AddRange(selectResult.Records);
@@ -220,7 +313,7 @@ namespace Compos.Coreforce
             }
         }
 
-        public async Task<List<dynamic>> Query(string command)
+        public async Task<List<dynamic>> QueryAsync(string command)
         {
             try
             {
@@ -237,7 +330,7 @@ namespace Compos.Coreforce
 
                 do
                 {
-                    using (var client = new HttpClient())
+                    using (var client = _client ?? new HttpClient())
                     {
                         client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
 
@@ -249,7 +342,19 @@ namespace Compos.Coreforce
                                         selectResult.NextRecordsUrl)))
                         {
                             var responseString = await message.Content.ReadAsStringAsync();
-                            selectResult = JsonConvert.DeserializeObject<SelectResult<ExpandoObject>>(responseString);
+
+                            try
+                            {
+                                selectResult = JsonConvert.DeserializeObject<SelectResult<ExpandoObject>>(responseString);
+                            }
+                            catch(JsonException exception)
+                            {
+                                throw new CoreforceException(
+                                    CoreforceError.JsonDeserializationError,
+                                    $"Response: {responseString}", 
+                                    exception
+                                    );
+                            }
 
                             if (selectResult?.Records != null)
                                 records.AddRange(selectResult.Records);
@@ -265,15 +370,15 @@ namespace Compos.Coreforce
             }
         }
 
-        public async Task<string> Insert<T>(T obj)
+        public async Task<string> InsertAsync<T>(T obj)
         {
-            return await Insert(typeof(T).Name, obj);
+            return await Insert(AttributeReader.GetSalesforceObjectName<T>(), obj);
         }
 
-        public async Task<string> Insert(string sObject, dynamic obj)
+        public async Task<string> InsertAsync(string sObject, dynamic obj)
         {
             dynamic expandoObject = new ExpandoObject();
-            var updateableFields = await GetSalesforceObjectFields(sObject, true);
+            var updateableFields = await GetSalesforceObjectFields(sObject, SalesforceObjectFieldAccessibility.Insert);
 
             foreach (var property in obj as IDictionary<string, object>)
             {
@@ -295,7 +400,7 @@ namespace Compos.Coreforce
 
                 var url = $"{authorizationResult.InstanceUrl}/services/data/{CoreforceConfiguration.ApiVersion}/sobjects/{sObject}";
 
-                using (var client = new HttpClient())
+                using (var client = _client ?? new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
 
@@ -314,13 +419,26 @@ namespace Compos.Coreforce
                                         )))
                     {
                         var responseString = await message.Content.ReadAsStringAsync();
-                        var insertResponse = JsonConvert.DeserializeObject<InsertResult>(responseString);
+                        InsertResult insertResponse = null;
+
+                        try
+                        {
+                            insertResponse = JsonConvert.DeserializeObject<InsertResult>(responseString);
+                        }
+                        catch (JsonException exception)
+                        {
+                            throw new CoreforceException(
+                                CoreforceError.JsonDeserializationError,
+                                $"Response: {responseString}",
+                                exception
+                                );
+                        }
 
                         if (insertResponse is null)
                             throw new CoreforceException(CoreforceError.NoInsertResponse);
 
                         if (string.IsNullOrEmpty(insertResponse.Id))
-                            throw new CoreforceException(CoreforceError.InsertError, insertResponse);
+                            throw new CoreforceException(CoreforceError.InsertError, insertResponse.Errors);
 
                         return insertResponse.Id;
                     }
@@ -332,12 +450,12 @@ namespace Compos.Coreforce
             }
         }
 
-        public async Task Update<T>(T obj)
+        public async Task UpdateAsync<T>(T obj)
         {
-            await Update(obj, null);
+            await UpdateAsync(obj, null);
         }
 
-        public async Task Update<T>(T obj, params Expression<Func<T, object>>[] fields)
+        public async Task UpdateAsync<T>(T obj, params Expression<Func<T, object>>[] fields)
         {
             try
             {
@@ -369,7 +487,7 @@ namespace Compos.Coreforce
                 foreach (PropertyInfo propertyInfo in obj.GetType().GetProperties()
                     .Where(x =>
                         !x.CustomAttributes.Any(y =>
-                            y.AttributeType == typeof(Readonly))).ToList())
+                            y.AttributeType == typeof(Readonly)) && x.Name.ToLower() != "id").ToList())
                 {
                     var value = propertyInfo.GetValue(obj);
 
@@ -382,11 +500,14 @@ namespace Compos.Coreforce
                         continue;
                     }
 
+                    else if (propertyInfo.PropertyType == typeof(Date) || propertyInfo.PropertyType == typeof(Date?))
+                        objAsDictionary.Add(propertyInfo.Name, value.ToString());
+
                     else
-                        objAsDictionary.Add(propertyInfo.Name, Convert.ChangeType(value, propertyInfo.PropertyType));
+                        objAsDictionary.Add(propertyInfo.Name, ChangeType(value, propertyInfo.PropertyType));
                 }
 
-                await Update<T>(typeof(T).Name, objAsDictionary, id.ToString());
+                await UpdateAsync<T>(AttributeReader.GetSalesforceObjectName<T>(), objAsDictionary, id.ToString());
             }
             catch(Exception)
             {
@@ -394,17 +515,27 @@ namespace Compos.Coreforce
             }
         }
 
-        public async Task Update(string sObject, dynamic obj)
+        private object ChangeType(object value, Type type)
         {
-            await Update(sObject, obj, null);
+            if (value == null || value == DBNull.Value)
+                return null;
+
+            var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+
+            return Convert.ChangeType(value, underlyingType);
         }
 
-        public async Task Update(string sObject, dynamic obj, params string[] fields)
+        public async Task UpdateAsync(string sObject, dynamic obj)
+        {
+            await UpdateAsync(sObject, obj, null);
+        }
+
+        public async Task UpdateAsync(string sObject, dynamic obj, params string[] fields)
         {
             try
             {
                 var objAsDictionary = new Dictionary<string, object>();
-                var updateableFields = await GetSalesforceObjectFields(sObject, true);
+                var updateableFields = await GetSalesforceObjectFields(sObject, SalesforceObjectFieldAccessibility.Update);
                 var id = string.Empty;
 
                 foreach(var property in obj as IDictionary<string, object>)
@@ -412,8 +543,9 @@ namespace Compos.Coreforce
                     if ((fields != null && fields.Any(x => x == property.Key) && updateableFields.Any(x => x == property.Key)) ||
                         (fields is null && updateableFields.Any(x => x == property.Key)))
                     {
-                        if ((property.Value.GetType() == typeof(DateTime) && (DateTime)property.Value == DateTime.MinValue) ||
-                            (property.Value.GetType() == typeof(DateTime?) && (DateTime?)property.Value == DateTime.MinValue))
+                        if (property.Value != null &&
+                            ((property.Value.GetType() == typeof(DateTime) && (DateTime)property.Value == DateTime.MinValue) ||
+                            (property.Value.GetType() == typeof(DateTime?) && (DateTime?)property.Value == DateTime.MinValue)))
                             continue;
 
                         objAsDictionary.Add(property.Key, property.Value);
@@ -422,7 +554,7 @@ namespace Compos.Coreforce
                         id = property.Value.ToString();
                 }
                     
-                await Update<dynamic>(sObject, objAsDictionary, id.ToString());
+                await UpdateAsync<dynamic>(sObject, objAsDictionary, id.ToString());
             }
             catch (Exception)
             {
@@ -430,7 +562,7 @@ namespace Compos.Coreforce
             }
         }
 
-        private async Task Update<T>(string sObject, Dictionary<string, object> objAsDictionary, string id)
+        private async Task UpdateAsync<T>(string sObject, Dictionary<string, object> objAsDictionary, string id)
         {
             try
             {
@@ -442,52 +574,70 @@ namespace Compos.Coreforce
                 var json = JsonConvert.SerializeObject(objAsDictionary);
 
                 var url = $"{authorizationResult.InstanceUrl}/services/data/{CoreforceConfiguration.ApiVersion}/sobjects/{sObject}/{id}";
+                var lockErrorCounter = 0;
 
-                using (var client = new HttpClient())
+                while (true)
                 {
-                    client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
-
-                    using (var message =
-                                await client.PatchAsync(
-                                    url,
-                                    new StringContent(
-                                        JsonConvert.SerializeObject(
-                                            objAsDictionary,
-                                            new JsonSerializerSettings
-                                            {
-                                                ContractResolver = new CoreforceContractResolver(
-                                                    objAsDictionary.Select(x => x.Key).ToList()
-                                                    )
-                                            }),
-                                        Encoding.UTF8,
-                                        "application/json"
-                                        )))
+                    using (var client = _client ?? new HttpClient())
                     {
-                        if (message.StatusCode == HttpStatusCode.NoContent)
-                            return;
+                        client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
 
-                        var responseString = await message.Content.ReadAsStringAsync();
-                        var apiErrors = JsonConvert.DeserializeObject<List<ApiError>>(responseString);
+                        using (var message =
+                            await client.PatchJsonAsync(
+                                url,
+                                JsonConvert.SerializeObject(
+                                    objAsDictionary,
+                                    new JsonSerializerSettings
+                                    {
+                                        ContractResolver = new CoreforceContractResolver(
+                                            objAsDictionary.Select(x => x.Key).ToList()
+                                            )
+                                    })))
+                        {
+                            if (message.StatusCode == HttpStatusCode.NoContent)
+                                return;
 
-                        if (apiErrors is null)
-                            throw new CoreforceException(CoreforceError.NoUpdateResponse);
+                            var responseString = await message.Content.ReadAsStringAsync();
 
-                        throw new CoreforceException(CoreforceError.UpdateError, apiErrors);
+                            if (responseString.ToLower().Contains(UNABLE_TO_LOCK_ROW.ToLower()))
+                                if(lockErrorCounter++ < 5)
+                                    continue;
+
+                            List<ApiError> apiErrors = null;
+
+                            try
+                            {
+                                apiErrors = JsonConvert.DeserializeObject<List<ApiError>>(responseString);
+                            }
+                            catch (JsonException exception)
+                            {
+                                throw new CoreforceException(
+                                    CoreforceError.JsonDeserializationError,
+                                    $"Response: {responseString}",
+                                    exception
+                                    );
+                            }
+
+                            if (apiErrors is null)
+                                throw new CoreforceException(CoreforceError.NoUpdateResponse);
+
+                            throw new CoreforceException(CoreforceError.UpdateError, apiErrors);
+                        }
                     }
                 }
             }
             catch (Exception exception)
             {
-                throw new CoreforceException(CoreforceError.UpdateError, $"Error while delete the sObject {id}. Please check the inner exception.", exception);
+                throw new CoreforceException(CoreforceError.UpdateError, $"Error while update the sObject {id}. Please check the inner exception.", exception);
             }
         }
 
-        public async Task Delete<T>(string id)
+        public async Task DeleteAsync<T>(string id)
         {
-            await Delete(typeof(T).Name, id);
+            await DeleteAsync(AttributeReader.GetSalesforceObjectName<T>(), id);
         }
 
-        public async Task Delete(string sObject, string id)
+        public async Task DeleteAsync(string sObject, string id)
         {
             try
             {
@@ -498,7 +648,7 @@ namespace Compos.Coreforce
 
                 var url = $"{authorizationResult.InstanceUrl}/services/data/{CoreforceConfiguration.ApiVersion}/sobjects/{sObject}/{id}";
 
-                using (var client = new HttpClient())
+                using (var client = _client ?? new HttpClient())
                 {
                     client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
 
@@ -509,7 +659,19 @@ namespace Compos.Coreforce
                             return;
 
                         var responseString = await message.Content.ReadAsStringAsync();
-                        var apiErrors = JsonConvert.DeserializeObject<List<ApiError>>(responseString);
+                        List<ApiError> apiErrors = null;
+                        try
+                        {
+                            apiErrors = JsonConvert.DeserializeObject<List<ApiError>>(responseString);
+                        }
+                        catch (JsonException exception)
+                        {
+                            throw new CoreforceException(
+                                CoreforceError.JsonDeserializationError,
+                                $"Response: {responseString}",
+                                exception
+                                );
+                        }
 
                         if (apiErrors is null)
                             throw new CoreforceException(CoreforceError.NoDeleteResponse);
@@ -524,18 +686,43 @@ namespace Compos.Coreforce
             }
         }
 
-        private async Task<List<string>> GetSalesforceObjectFields(string sObject, bool onlyUpdateableFields)
+        private async Task<List<string>> GetSalesforceObjectFields(string sObject, SalesforceObjectFieldAccessibility fieldAccessibility)
+        {
+            try
+            {
+                Description sObjectDescription = await GetDescription(sObject);
+                var sObjectFields = new List<string>();
+                
+                foreach(var field in sObjectDescription.fields)
+                {
+                    if ((fieldAccessibility == SalesforceObjectFieldAccessibility.Insert &&
+                        !field.createable) ||
+                        (fieldAccessibility == SalesforceObjectFieldAccessibility.Update &&
+                        !field.updateable))
+                        continue;
+
+                    sObjectFields.Add(field.name);
+                }
+
+                return sObjectFields;
+            }
+            catch (Exception exception)
+            {
+                throw new CoreforceException(CoreforceError.ProcessingError, exception);
+            }
+        }
+
+        private async Task<Description> GetDescription(string sObject)
         {
             try
             {
                 Description sObjectDescription = descriptionList.FirstOrDefault(x => x.name.ToLower() == sObject.ToLower());
-                var sObjectFields = new List<string>();
 
                 if (sObjectDescription is null)
                 {
                     var authorizationResult = await SalesforceOpenAuthorization.Authorize();
 
-                    using (var client = new HttpClient())
+                    using (var client = _client ?? new HttpClient())
                     {
                         client.DefaultRequestHeaders.Add("Authorization", "Bearer " + authorizationResult.AccessToken);
 
@@ -543,7 +730,19 @@ namespace Compos.Coreforce
                                     await client.GetAsync($"{authorizationResult.InstanceUrl}/services/data/{CoreforceConfiguration.ApiVersion}/sobjects/{sObject}/describe"))
                         {
                             var responseString = await message.Content.ReadAsStringAsync();
-                            sObjectDescription = JsonConvert.DeserializeObject<Description>(responseString);
+
+                            try
+                            {
+                                sObjectDescription = JsonConvert.DeserializeObject<Description>(responseString);
+                            }
+                            catch (JsonException exception)
+                            {
+                                throw new CoreforceException(
+                                    CoreforceError.JsonDeserializationError,
+                                    $"Response: {responseString}",
+                                    exception
+                                    );
+                            }
 
                             if (sObjectDescription is null)
                                 throw new CoreforceException(CoreforceError.SalesforceObjectNotFound);
@@ -553,16 +752,7 @@ namespace Compos.Coreforce
                     }
                 }
 
-                foreach(var field in sObjectDescription.fields)
-                {
-                    if ((onlyUpdateableFields && !field.updateable) ||
-                        !field.filterable)
-                        continue;
-
-                    sObjectFields.Add(field.name);
-                }
-
-                return sObjectFields;
+                return sObjectDescription;
             }
             catch (Exception exception)
             {

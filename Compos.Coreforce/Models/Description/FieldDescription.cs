@@ -40,7 +40,7 @@ namespace Compos.Coreforce.Models.Description
         public bool namePointing { get; set; }
         public bool nillable { get; set; }
         public bool permissionable { get; set; }
-        public List<object> picklistValues { get; set; }
+        public List<PicklistValue> picklistValues { get; set; }
         public int precision { get; set; }
         public bool queryByDistance { get; set; }
         public object referenceTargetField { get; set; }

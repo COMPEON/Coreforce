@@ -11,6 +11,21 @@ namespace Compos.Coreforce.Filter
         private readonly IList<object> values;
         private readonly FilterConcatination? concatination;
 
+        public Expression<Func<T, object>> Field
+        {
+            get => field;
+        }
+
+        public IList<object> Values
+        {
+            get => values;
+        }
+
+        public FilterConcatination? Concatination
+        {
+            get => concatination;
+        }
+
         public FilterIn(Expression<Func<T, object>> field, List<object> values)
         {
             this.field = field;
@@ -69,6 +84,21 @@ namespace Compos.Coreforce.Filter
         private readonly string field;
         private readonly IList<object> values;
         private readonly FilterConcatination? concatination;
+
+        public string Field
+        {
+            get => field;
+        }
+
+        public IList<object> Values
+        {
+            get => values;
+        }
+
+        public FilterConcatination? Concatination
+        {
+            get => concatination;
+        }
 
         public FilterIn(string field, List<object> values)
         {
